@@ -70,6 +70,46 @@ public class ConcurrentSearchBenchmark implements Runnable {
     }
   }
 
+  private double computeMean(int start, int stop) {
+    double mean = 0;
+    for(int j = start; j <= stop; j++) {
+      mean = mean + times[j];
+    }
+    return mean/(stop-start+1);
+  }
+
+  private double computeCoV(int start, int stop) {
+    double mean = computeMean(start, stop);
+    double s = 0;
+    for(int j = start; j <= stop; j++) {
+      s = s + (times[j] - mean)*(times[j] - mean);
+    }
+    s = Math.sqrt(s/(stop-start));
+    return s/mean;
+  }
+
+  private int areWeThereYet(int iteration, double stop_cov) {
+    if ( iteration < warmup_iterations + timing_iterations )
+      return 0;
+    
+    int start = iteration - timing_iterations;
+    int stop = iteration;
+    double cov = computeCoV(start, stop);
+    if(cov < stop_cov ) {
+      return start;
+    }
+
+    if (iteration == MAX_ITERATIONS - 1) {
+      for (int i = warmup_iterations + timing_iterations; i <= iteration; i++) {
+        stop = areWeThereYet(i, stop_cov + 0.01);
+        if ( stop > 0 )
+          return stop;
+      }
+    }
+
+    return 0; 
+  }
+
   public void run() {
     ThreadLocalRandom prng = ThreadLocalRandom.current();
     for ( int i = 0; i < num_operations/num_threads; i++ ) {
@@ -106,6 +146,15 @@ public class ConcurrentSearchBenchmark implements Runnable {
       long stop_time = System.nanoTime();
       times[iteration] = times[iteration] + stop_time - start_time;
       System.out.println(times[iteration]);
+
+      int start = areWeThereYet(iteration, max_cov);
+      if ( start > 0 ) {
+        int stop = start + timing_iterations;
+        double cov = computeCoV(start, stop);
+        double mm = computeMean(start, stop);
+        System.out.println("CoV: " + cov + "\tmean: " + mm + "\tstop: " + stop);
+        System.exit(0);
+      }
       reset();
     }
   }
