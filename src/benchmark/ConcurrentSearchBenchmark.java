@@ -79,6 +79,10 @@ public class ConcurrentSearchBenchmark implements Runnable {
     reset();
   }
   
+  /* reset
+   * Resets some of this object's state, invoked each benchmark iteration
+   * and by the constructor.
+   */
   private void reset() {
     switch ( map_algorithm ) {
       case 0:
@@ -95,6 +99,9 @@ public class ConcurrentSearchBenchmark implements Runnable {
     }
   }
 
+  /* computeMean
+   * Arithmetic mean of times[] between start and stop, inclusive.
+   */
   private double computeMean(int start, int stop) {
     double mean = 0;
     for(int j = start; j <= stop; j++) {
@@ -103,17 +110,28 @@ public class ConcurrentSearchBenchmark implements Runnable {
     return mean/(stop-start+1);
   }
 
+  /* computeCoV
+   * Calculates the coefficient of variation (CoV) for times[] between
+   * start and stop, inclusive. CoV is the ratio of the
+   * sample standard deviation (s) to the sample mean (m): s/m
+   */
   private double computeCoV(int start, int stop) {
-    double mean = computeMean(start, stop);
+    double m = computeMean(start, stop);
     double s = 0;
     for(int j = start; j <= stop; j++) {
-      s = s + (times[j] - mean)*(times[j] - mean);
+      s = s + (times[j] - m)*(times[j] - m);
     }
     s = Math.sqrt(s/(stop-start));
-    return s/mean;
+    return s/m;
   }
 
+  /* areWeThereYet
+   * Returns the starting iteration for timing_iterations consecutive
+   * results with a CoV less than stop_cov, or with the smallest CoV if
+   * MAX_ITERATIONS is reached.
+   */
   private int areWeThereYet(int iteration, double stop_cov) {
+    // skip the warmup
     if ( iteration < warmup_iterations + timing_iterations )
       return 0;
     
@@ -124,6 +142,8 @@ public class ConcurrentSearchBenchmark implements Runnable {
       return start;
     }
 
+    // If the max number of iterations is reached, report the smallest CoV
+    // for timing_iterations consecutive results past the warmup
     if (iteration == MAX_ITERATIONS - 1) {
       for (int i = warmup_iterations + timing_iterations; i <= iteration; i++) {
         stop = areWeThereYet(i, stop_cov + 0.01);
@@ -135,6 +155,11 @@ public class ConcurrentSearchBenchmark implements Runnable {
     return 0; 
   }
 
+  /* run
+   * Thread entry point for benchmark threads, the run function does 
+   * the num_operations/num_threads amount of work according to the percent
+   * parameters.
+   */
   public void run() {
     ThreadLocalRandom prng = ThreadLocalRandom.current();
     for ( int i = 0; i < num_operations/num_threads; i++ ) {
@@ -150,6 +175,15 @@ public class ConcurrentSearchBenchmark implements Runnable {
     }
   }
 
+  /* benchmark
+   * In a loop that executes up to MAX_ITERATIONS times, the benchmark
+   * method Creates threads to execute the benchmark workload and times the
+   * completion time for all threads. If the times for timing_iterations
+   * consecutive iterations past the first warmup_iterations has a CoV less
+   * than max_cov, the benchmark terminates and reports results. If
+   * MAX_ITERATIONS is reached, the smallest CoV achieved for timing_iterations
+   * is reported along with the timing results.
+   */
   public void benchmark() {
     Thread threads[] = new Thread[num_threads];
     for ( int iteration = 0; iteration < MAX_ITERATIONS; iteration++ ) {
@@ -198,10 +232,13 @@ public class ConcurrentSearchBenchmark implements Runnable {
      *   percent_search
      *   map_algorithm
      */
+    // these parameters are generic for Java benchmarking
     int warmup_iterations = 0;
     int timing_iterations = 0;
     float max_cov = 0;
     int num_threads = 0;
+
+    // the rest are specific to the search benchmark
     int key_range = 0;
     int num_operations = 0;
     float percent_insert = 0;
